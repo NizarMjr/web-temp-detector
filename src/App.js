@@ -1,17 +1,19 @@
 import React, { useEffect, useState } from "react";
-import cong from "./configuration"; // Your Firebase config
-import { getDatabase, ref, onValue } from "firebase/database";
+import cong from "./config"; // Your Firebase config
+import { getDatabase, ref, onValue, set } from "firebase/database";
 import TemperatureAdvice from "./components/Advices"; // Import the new component
 import "./App.css";
 
 function App() {
   const [temperature, setTemperature] = useState(null);
   const [lastUpdated, setLastUpdated] = useState("");
-  const [isConnected, setIsConnected] = useState(false);
+  const [ledState, setLedState] = useState(false); // LED state
   const MIN_TEMP = 36.5;
   const MAX_TEMP = 39.0;
 
   useEffect(() => {
+    console.log('cong', cong);
+
     const db = getDatabase(cong);
     const tempRef = ref(db, "temperature");
 
@@ -24,12 +26,14 @@ function App() {
         }
       });
     };
-    const connectedRef = ref(getDatabase(cong), ".info/connected");
-    onValue(connectedRef, (snapshot) => {
-      const connected = snapshot.val();
-      setIsConnected(connected === true);
-    });
 
+    const ledRef = ref(db, "led/state");
+    onValue(ledRef, (snapshot) => {
+      const ledValue = snapshot.val();
+      if (ledValue !== null) {
+        setLedState(ledValue); // Update LED state
+      }
+    });
     fetchData();
   }, []);
 
@@ -40,13 +44,26 @@ function App() {
       : "✅ Normal";
   };
 
+  // Function to toggle LED state
+  const toggleLedState = () => {
+    const newLedState = !ledState;
+    setLedState(newLedState);
+
+    // Save new LED state to Firebase
+    const db = getDatabase(cong);
+    const ledRef = ref(db, "led/state");
+    set(ledRef, newLedState); // Set new LED state in Firebase
+  };
+
   return (
     <div className="app">
-      <div className="led-container">
-        <div className={`led ${isConnected ? "connected" : "disconnected"}`}></div>
-        <span className="led-label">{isConnected ? "Connected" : "Disconnected"}</span>
-      </div>
       <div className="card">
+        <div className="led-container">
+          <div className={`led ${ledState ? "on" : "off"}`}></div>
+          <span className="led-label">
+            {ledState ? "LED: ON" : "LED: OFF"}
+          </span>
+        </div>
         <h1>🌡️ Smart Temperature Monitor</h1>
         <h3>📍 Location: Marsa Tunis</h3>
 
@@ -63,6 +80,12 @@ function App() {
           <p>🔺 Max Threshold: {MAX_TEMP.toFixed(1)}°C</p>
           <p>⏱️ Last updated: {lastUpdated || "Fetching..."}</p>
         </div>
+
+        {/* Button to toggle LED */}
+        <button className={`${ledState ? "off" : "on"} `} onClick={toggleLedState}>
+          Turn Led {ledState ? 'OFF' : 'ON'}
+        </button>
+
       </div>
 
       {/* Adding the TemperatureAdvice component */}
